@@ -1,0 +1,43 @@
+CreateFile.file()              None    Erstellt eine neue Datei
+                               str     Pfad zur Datei, z.B. "test.txt"
+                               str     Optional: Inhalt der Datei
+                               bool    Optional: print_output=True/False
+
+UpdateFile.name()              str     Datei umbenennen, gibt neuen Pfad zurück
+                               str     Alter Pfad
+                               str     Neuer Name
+                               bool    Optional: print_output=True/False
+
+UpdateFile.move_to_path()      str     Datei in einen neuen Ordner verschieben, gibt neuen Pfad zurück
+                               str     Alter Pfad
+                               str     Zielordner
+                               bool    Optional: print_output=True/False
+
+UpdateFile.content()           None    Inhalt der Datei überschreiben
+                               str     Pfad zur Datei
+                               str     Neuer Inhalt
+                               bool    Optional: print_output=True/False
+
+DeleteFile.file()              None    Löscht eine Datei
+                               str     Pfad zur Datei
+                               bool    Optional: print_output=True/False
+
+DuplicateFile.file()           str     Dupliziert eine Datei, gibt neuen Pfad zurück
+                               str     Pfad zur Datei
+                               str     Optional: Zielpfad (sonst "_copy" Suffix)
+                               bool    Optional: print_output=True/False
+
+GetFile.name()                 str     Liefert den Dateinamen
+                               str     Pfad zur Datei
+
+GetFile.content()              str     Liefert den Inhalt der Datei
+                               str     Pfad zur Datei
+
+GetFile.path()                 str     Liefert den absoluten Pfad
+                               str     Pfad zur Datei
+
+GetFile.file_extension()       str     Liefert die Dateiendung, z.B. ".txt"
+                               str     Pfad zur Datei
+
+GetFile.file_type()            str     Prüft Typ: "file", "directory" oder "unknown"
+                               str     Pfad zur Datei oder Verzeichnis

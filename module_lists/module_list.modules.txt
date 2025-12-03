@@ -1,0 +1,12 @@
+Install.module()               None    Installiert ein Python-Modul via pip
+                               str     Modulname angeben: "requests"
+                               bool    Optional: print_output=True/False, steuert Konsolen-Output
+
+Uninstall.module()             None    Deinstalliert ein Python-Modul via pip
+                               str     Modulname angeben: "requests"
+                               bool    Optional: print_output=True/False, steuert Konsolen-Output
+
+Update.module()                None    Aktualisiert ein Python-Modul via pip
+                               str     Modulname angeben: "requests"
+                               str     Optional: Version angeben, z.B. "2.31.0"
+                               bool    Optional: print_output=True/False, steuert Konsolen-Output

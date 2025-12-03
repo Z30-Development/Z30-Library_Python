@@ -1,0 +1,44 @@
+FormatTemplate.type_1()      str          Formatierte Ausgabe Typ 1: [Symbol] Name: Wert
+FormatTemplate.type_2()      str          Formatierte Ausgabe Typ 2: (Symbol) Name: Wert
+FormatTemplate.type_3()      str          Formatierte Ausgabe Typ 3: {Symbol} Name: Wert
+FormatTemplate.type_4()      str          Formatierte Ausgabe Typ 4: Symbol Name: Wert
+
+CPU.__init__()               CPU          CPU-Objekt erstellen
+GPU.__init__()               GPU          GPU-Objekt erstellen
+RAM.__init__()               RAM          RAM-Objekt erstellen
+NetworkDevice.__init__()     NetworkDevice Netzwerkgerät-Objekt erstellen
+Mainboard.__init__()         Mainboard    Mainboard-Objekt erstellen
+BIOS.__init__()              BIOS         BIOS-Objekt erstellen
+OS.__init__()                OS           OS-Objekt erstellen
+
+CPU.check.has_hyperthreading() bool       Prüft ob Hyperthreading aktiv
+CPU.check.is_64bit()          bool        Prüft ob 64-Bit Architektur
+GPU.check.is_nvidia()         bool        Prüft ob NVIDIA GPU
+GPU.check.is_amd()            bool        Prüft ob AMD GPU
+RAM.check.more_than()         bool        Prüft ob mehr als X GB RAM
+NetworkDevice.check.is_ethernet() bool    Prüft ob Ethernet-Gerät
+NetworkDevice.check.is_wireless() bool    Prüft ob Wireless-Gerät
+Mainboard.check.is_asus()     bool        Prüft ob ASUS Mainboard
+Mainboard.check.is_msi()      bool        Prüft ob MSI Mainboard
+Mainboard.check.is_gigabyte() bool        Prüft ob Gigabyte Mainboard
+BIOS.check.is_uefi()          bool        Prüft ob UEFI BIOS
+OS.check.is_windows()         bool        Prüft ob Windows OS
+OS.check.is_linux()           bool        Prüft ob Linux OS
+OS.check.is_mac()             bool        Prüft ob macOS
+
+get_cpu_name()                CPU         Liefert CPU-Name
+get_cpu_driver_date()         CPU         Liefert CPU-Treiberdatum
+get_cpu_driver_url()          CPU         Liefert CPU-Treiber-URL
+get_gpu_name()                GPU         Liefert GPU-Name
+get_gpu_driver_date()         GPU         Liefert GPU-Treiberdatum
+get_gpu_driver_url()          GPU         Liefert GPU-Treiber-URL
+get_ram_storage()             RAM         Liefert RAM in GB
+get_network_device_name()     NetworkDevice Liefert Netzwerkgerätename
+get_network_device_driver_date() NetworkDevice Liefert Netzwerktreiberdatum
+get_network_device_driver_url() NetworkDevice Liefert Netzwerktreiber-URL
+get_mainboard_name()          Mainboard   Liefert Mainboard-Name
+get_bios_version()            BIOS        Liefert BIOS/UEFI-Version
+get_os_name()                 OS          Liefert Betriebssystem-Name
+get_os_release()              OS          Liefert OS-Release-Version
+get_os_version()              OS          Liefert detaillierte OS-Version
+get_os_url()                  OS          Liefert OS-Download-URL

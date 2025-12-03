@@ -1,0 +1,43 @@
+FormatTemplate.type_1()       str     Formatierte Ausgabe Typ 1: [Symbol] Name: Wert
+FormatTemplate.type_2()       str     Formatierte Ausgabe Typ 2: (Symbol) Name: Wert
+FormatTemplate.type_3()       str     Formatierte Ausgabe Typ 3: {Symbol} Name: Wert
+FormatTemplate.type_4()       str     Formatierte Ausgabe Typ 4: Symbol Name: Wert
+
+IP.__init__()                 IP      IP-Objekt erstellen
+MAC.__init__()                MAC     MAC-Adress-Objekt erstellen
+Location.__init__()           Location Standort-Objekt erstellen
+
+IP.check.is_private()         bool    Prüft ob private IP
+IP.check.is_public()          bool    Prüft ob öffentliche IP
+IP.check.is_ipv4()            bool    Prüft ob IPv4 Adresse
+IP.check.is_ipv6()            bool    Prüft ob IPv6 Adresse
+IP.check.is_loopback()        bool    Prüft ob Loopback Adresse
+IP.check.is_link_local()      bool    Prüft ob Link-Local Adresse
+IP.check.is_multicast()       bool    Prüft ob Multicast Adresse
+IP.check.is_reserved()        bool    Prüft ob reservierte IP
+IP.check.get_ip_version()     int     Gibt IP Version zurück (4 oder 6)
+IP.check.belongs_to_network() bool    Prüft ob IP in Netzwerk ist
+
+MAC.check.is_mac()            bool    Prüft ob gültige MAC-Adresse
+MAC.check.is_unicast()        bool    Prüft ob Unicast MAC
+MAC.check.is_multicast()      bool    Prüft ob Multicast MAC
+MAC.check.is_global()         bool    Prüft ob global eindeutige MAC
+MAC.check.is_local()          bool    Prüft ob lokal verwaltete MAC
+MAC.check.get_manufacturer()  str     Ermittelt Hersteller der MAC
+
+get_private_ip()              IP      Liefert private IP-Adresse
+get_public_ip()               IP      Liefert öffentliche IP-Adresse
+get_mac_address()             MAC     Liefert MAC-Adresse (optional mit Interface)
+get_router_ip()               IP      Liefert Router/Gateway IP
+get_router_mac()              MAC     Liefert Router MAC-Adresse
+get_all_private_ips()         List[IP] Liefert alle privaten IPs
+get_dns_servers()             List[IP] Liefert DNS Server Adressen
+get_subnet_mask()             IP      Liefert Subnetzmaske
+get_network_cidr()            str     Liefert Netzwerk in CIDR Notation
+get_ip_location()             Dict    Liefert Geolocation Daten für IP
+get_network_speed()           Dict    Liefert Netzwerk-Geschwindigkeit
+get_connection_type()         str     Liefert Verbindungstyp (WiFi/Ethernet)
+get_hostname()                str     Liefert System-Hostname
+get_fqdn()                    str     Liefert Fully Qualified Domain Name
+get_network_interfaces()      List[Dict] Liefert alle Netzwerk-Interfaces
+get_open_ports()              List[Tuple] Liefert offene Ports (mit Service)

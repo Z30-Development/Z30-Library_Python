@@ -1,0 +1,2 @@
+HTTP.get()                  requests.Response  Führt GET Request aus, Ausgabe optional, Rückgabe Response-Objekt
+HTTP.send()                 requests.Response  Führt POST Request aus, Daten oder JSON möglich, Ausgabe optional, Rückgabe Response-Objekt
