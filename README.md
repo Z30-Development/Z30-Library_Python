@@ -3,7 +3,7 @@
 [![Join our Discord](https://img.shields.io/badge/Discord-Join%20Server-7289DA?logo=discord&logoColor=white)](https://discord.gg/z30) [![PyPI](https://img.shields.io/pypi/v/z30lib?color=blue&logo=python&logoColor=white)](https://pypi.org/project/z30lib/)
 
 [![Windows](https://img.shields.io/badge/Windows-333333?style=flat&logo=icloud&logoColor=white)](https://www.microsoft.com/de-de/software-download/windows11)
-[![Linux](https://img.shields.io/badge/OS-Linux-333333?logo=linux&logoColor=white)](https://www.linux.org/pages/download/)
+[![Linux](https://img.shields.io/badge/OS-Linux-333333?style=flat&logo=linux&logoColor=white)](https://www.linux.org/pages/download/)
 [![macOS](https://img.shields.io/badge/OS-MacOS-333333?style=flat&labelColor=333333&logo=apple&logoColor=white)](https://support.apple.com/de-de/102662)
 
 # Z30 Library for Python
