@@ -1,4 +1,4 @@
-[![z30lib Repository](https://img.shields.io/badge/github-repo-blue?logo=github)](https://github.com/Z30-Development/z30lib)
+[![z30lib Repository](https://img.shields.io/badge/GitHub-Repository-0ab5e2?style=flat&logo=github&logoColor=white)](https://github.com/Z30-Development/z30lib)
 
 [![Join our Discord](https://img.shields.io/badge/Discord-Join%20Server-7289DA?logo=discord&logoColor=white)](https://discord.gg/z30) [![PyPI](https://img.shields.io/pypi/v/z30lib?color=blue&logo=python&logoColor=white)](https://pypi.org/project/z30lib/)
 
