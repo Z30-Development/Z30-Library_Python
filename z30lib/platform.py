@@ -2,9 +2,14 @@ import platform
 import psutil
 import cpuinfo
 import subprocess
-import winreg
+if platform.system() == "Windows":
+    import winreg
+    import ctypes
+else:
+    winreg = None
 import os
 from datetime import datetime
+import re
 
 # ---------------------------------------------------------------- FORMAT TEMPLATE ----------------------------------------------------------------
 
@@ -238,6 +243,11 @@ def get_cpu_name():
                 for line in f:
                     if 'model name' in line:
                         return CPU(line.split(':')[1].strip())
+        elif platform.system() == "Darwin":
+            output = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], 
+                                            stderr=subprocess.DEVNULL).decode().strip()
+            if output:
+                return CPU(output)
     except:
         pass
     
@@ -271,6 +281,28 @@ def get_cpu_driver_date():
                     date_str = install_date.split('.')[0]
                     date_obj = datetime.strptime(date_str[:8], "%Y%m%d")
                     return CPU(date_obj.strftime("%d/%m/%Y"))
+        elif platform.system() == "Linux":
+            # Check for microcode update date
+            microcode_paths = [
+                '/sys/devices/system/cpu/microcode/reload',
+                '/sys/devices/system/cpu/cpu0/microcode/version'
+            ]
+            for path in microcode_paths:
+                if os.path.exists(path):
+                    mtime = os.path.getmtime(path)
+                    date_obj = datetime.fromtimestamp(mtime)
+                    return CPU(date_obj.strftime("%d/%m/%Y"))
+        elif platform.system() == "Darwin":
+            # Check system update history for Apple Silicon
+            try:
+                output = subprocess.check_output(["system_profiler", "SPInstallHistoryDataType"], 
+                                                stderr=subprocess.DEVNULL).decode()
+                for line in output.split('\n'):
+                    if 'Install Date' in line:
+                        date_str = line.split(':')[1].strip()
+                        return CPU(date_str)
+            except:
+                pass
     except:
         pass
     
@@ -286,7 +318,7 @@ def get_cpu_driver_url():
             return CPU("https://downloadcenter.intel.com/product/80939/Intel-Processor-Identification-Utility")
         elif "amd" in cpu:
             return CPU("https://www.amd.com/en/support/chipsets/amd-socket-am4")
-        elif "apple" in cpu:
+        elif "apple" in cpu or "m1" in cpu or "m2" in cpu or "m3" in cpu:
             return CPU("https://support.apple.com/downloads")
         elif "arm" in cpu or "qualcomm" in cpu:
             return CPU("https://developer.arm.com/downloads")
@@ -320,32 +352,60 @@ def get_gpu_name():
     
     if gpu_name == "Unknown GPU":
         try:
+            # Try nvidia-smi
             output = subprocess.check_output(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], 
-                                            shell=True, stderr=subprocess.DEVNULL).decode().strip()
-            if output and "NVIDIA" in output:
+                                            stderr=subprocess.DEVNULL, shell=platform.system() == "Windows").decode().strip()
+            if output:
                 gpu_name = output
         except:
             pass
     
     if gpu_name == "Unknown GPU" and platform.system() == "Linux":
         try:
+            # Use lspci for Linux
             output = subprocess.check_output(["lspci", "-v"], stderr=subprocess.DEVNULL).decode()
             for line in output.split('\n'):
-                if "VGA compatible controller" in line or "3D controller" in line:
+                if "VGA compatible controller" in line or "3D controller" in line or "Display controller" in line:
                     parts = line.split(':')
                     if len(parts) > 2:
                         gpu_name = parts[2].strip()
                         break
         except:
-            pass
+            try:
+                # Alternative: check /sys/class/drm
+                drm_path = "/sys/class/drm/"
+                if os.path.exists(drm_path):
+                    for entry in os.listdir(drm_path):
+                        if "card" in entry and not "-" in entry:
+                            card_path = os.path.join(drm_path, entry, "device")
+                            if os.path.exists(card_path):
+                                vendor_path = os.path.join(card_path, "vendor")
+                                if os.path.exists(vendor_path):
+                                    with open(vendor_path, 'r') as f:
+                                        vendor_id = f.read().strip()
+                                        if "0x10de" in vendor_id:
+                                            gpu_name = "NVIDIA Graphics"
+                                        elif "0x1002" in vendor_id:
+                                            gpu_name = "AMD Graphics"
+                                        elif "0x8086" in vendor_id:
+                                            gpu_name = "Intel Graphics"
+            except:
+                pass
     
     if gpu_name == "Unknown GPU" and platform.system() == "Darwin":
         try:
+            # Use system_profiler for macOS
             output = subprocess.check_output(["system_profiler", "SPDisplaysDataType"], 
                                             stderr=subprocess.DEVNULL).decode()
             for line in output.split('\n'):
                 if "Chipset Model" in line:
                     gpu_name = line.split(':')[1].strip()
+                    break
+                elif "Graphics" in line and "Intel" in line:
+                    gpu_name = "Intel Integrated Graphics"
+                    break
+                elif "Graphics" in line and "Apple" in line:
+                    gpu_name = "Apple Silicon Graphics"
                     break
         except:
             pass
@@ -359,28 +419,27 @@ def get_gpu_driver_date():
         if platform.system() == "Windows":
             import winreg
             try:
+                # Try NVIDIA registry
                 key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                                    r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000", 
-                                    0, winreg.KEY_READ)
+                                    r"SOFTWARE\NVIDIA Corporation\Global\NVTweak", 
+                                    0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
                 driver_date, _ = winreg.QueryValueEx(key, "DriverDate")
                 winreg.CloseKey(key)
-                
-                try:
-                    date_parts = driver_date.split('-')
-                    if len(date_parts) == 3:
-                        month, day, year = date_parts
-                        date_obj = datetime(int(year), int(month), int(day))
-                        return GPU(date_obj.strftime("%d/%m/%Y"))
-                except:
-                    return GPU(driver_date)
+                return GPU(driver_date)
             except:
-                pass
+                try:
+                    # Try AMD registry
+                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
+                                        r"SOFTWARE\AMD\Install", 
+                                        0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
+                    driver_date, _ = winreg.QueryValueEx(key, "InstallDate")
+                    winreg.CloseKey(key)
+                    return GPU(driver_date)
+                except:
+                    pass
             
             try:
                 import wmi
-                import os
-                from datetime import datetime
-                
                 c = wmi.WMI()
                 for gpu in c.Win32_VideoController():
                     if gpu.InstalledDriver and gpu.InstalledDriver.strip():
@@ -391,6 +450,29 @@ def get_gpu_driver_date():
                             return GPU(date_obj.strftime("%d/%m/%Y"))
             except:
                 pass
+        elif platform.system() == "Linux":
+            # Check for GPU driver module modification date
+            modules = ["nvidia", "amdgpu", "radeon", "i915"]
+            for module in modules:
+                module_path = f"/lib/modules/{os.uname().release}/kernel/drivers/gpu/drm/{module}"
+                if os.path.exists(module_path):
+                    mtime = os.path.getmtime(module_path)
+                    date_obj = datetime.fromtimestamp(mtime)
+                    return GPU(date_obj.strftime("%d/%m/%Y"))
+            
+            # Check Xorg log
+            xorg_log = "/var/log/Xorg.0.log"
+            if os.path.exists(xorg_log):
+                mtime = os.path.getmtime(xorg_log)
+                date_obj = datetime.fromtimestamp(mtime)
+                return GPU(date_obj.strftime("%d/%m/%Y"))
+        elif platform.system() == "Darwin":
+            # Check Metal driver
+            metal_path = "/System/Library/Frameworks/Metal.framework"
+            if os.path.exists(metal_path):
+                mtime = os.path.getmtime(metal_path)
+                date_obj = datetime.fromtimestamp(mtime)
+                return GPU(date_obj.strftime("%d/%m/%Y"))
     except:
         pass
     
@@ -408,13 +490,15 @@ def get_gpu_driver_url():
             return GPU("https://www.amd.com/en/support")
         elif "intel" in gpu:
             return GPU("https://downloadcenter.intel.com/product/80939/Graphics")
-        elif "apple" in gpu:
+        elif "apple" in gpu or "silicon" in gpu:
             return GPU("https://support.apple.com/downloads/macos")
         
         if platform.system() == "Windows":
             return GPU("https://www.microsoft.com/en-us/windows/windows-update")
         elif platform.system() == "Linux":
             return GPU("https://nouveau.freedesktop.org/")
+        elif platform.system() == "Darwin":
+            return GPU("https://support.apple.com/software-update")
     except:
         pass
     
@@ -472,36 +556,50 @@ def get_network_device_name():
                     return NetworkDevice(nic.Name.strip())
         elif platform.system() == "Linux":
             try:
+                # Try to get default route interface
                 output = subprocess.check_output(["ip", "route", "show", "default"], 
                                                 stderr=subprocess.DEVNULL).decode()
                 if output:
                     interface = output.split()[4]
-                    output = subprocess.check_output(["ethtool", "-i", interface], 
-                                                    stderr=subprocess.DEVNULL).decode()
-                    for line in output.split('\n'):
-                        if 'driver:' in line:
-                            driver_name = line.split(':')[1].strip()
+                    # Try to get driver info
+                    try:
+                        output = subprocess.check_output(["ethtool", "-i", interface], 
+                                                        stderr=subprocess.DEVNULL).decode()
+                        driver_name = ""
+                        for line in output.split('\n'):
+                            if 'driver:' in line:
+                                driver_name = line.split(':')[1].strip()
+                                break
+                        if driver_name:
                             return NetworkDevice(f"{interface} ({driver_name})")
+                    except:
+                        pass
                     return NetworkDevice(interface)
             except:
+                # Fallback to psutil
                 for iface in psutil.net_if_stats():
                     if psutil.net_if_stats()[iface].isup:
                         return NetworkDevice(iface)
         elif platform.system() == "Darwin":
-            output = subprocess.check_output(["networksetup", "-listallhardwareports"], 
-                                            stderr=subprocess.DEVNULL).decode()
-            current_device = ""
-            for line in output.split('\n'):
-                if 'Device:' in line:
-                    current_device = line.split(':')[1].strip()
-                elif 'Ethernet' in line or 'Wi-Fi' in line:
-                    return NetworkDevice(f"{line.split(':')[1].strip()} ({current_device})")
+            try:
+                output = subprocess.check_output(["networksetup", "-listallhardwareports"], 
+                                                stderr=subprocess.DEVNULL).decode()
+                current_device = ""
+                for line in output.split('\n'):
+                    if 'Device:' in line:
+                        current_device = line.split(':')[1].strip()
+                    elif 'Ethernet' in line or 'Wi-Fi' in line or 'AirPort' in line:
+                        port_name = line.split(':')[1].strip()
+                        return NetworkDevice(f"{port_name} ({current_device})")
+            except:
+                pass
     except:
         pass
     
+    # Final fallback
     interfaces = psutil.net_if_addrs()
     for iface in interfaces:
-        if iface and "lo" not in iface:
+        if iface and "lo" not in iface and "vbox" not in iface:
             return NetworkDevice(iface)
     
     return NetworkDevice("Ethernet Adapter")
@@ -533,6 +631,30 @@ def get_network_device_driver_date():
                     except:
                         break
                 winreg.CloseKey(key)
+            except:
+                pass
+        elif platform.system() == "Linux":
+            # Check network driver module date
+            try:
+                interface = str(get_network_device_name()).split('(')[0].strip()
+                driver_output = subprocess.check_output(["ethtool", "-i", interface], 
+                                                       stderr=subprocess.DEVNULL).decode()
+                driver_name = ""
+                for line in driver_output.split('\n'):
+                    if 'driver:' in line:
+                        driver_name = line.split(':')[1].strip()
+                        break
+                
+                if driver_name:
+                    module_path = f"/lib/modules/{os.uname().release}/kernel/drivers/net"
+                    if os.path.exists(module_path):
+                        for root, dirs, files in os.walk(module_path):
+                            for file in files:
+                                if driver_name in file:
+                                    full_path = os.path.join(root, file)
+                                    mtime = os.path.getmtime(full_path)
+                                    date_obj = datetime.fromtimestamp(mtime)
+                                    return NetworkDevice(date_obj.strftime("%d/%m/%Y"))
             except:
                 pass
     except:
@@ -569,11 +691,15 @@ def get_network_device_driver_url():
             return NetworkDevice("https://www.qualcomm.com/products/application/networking")
         elif "marvell" in device:
             return NetworkDevice("https://www.marvell.com/support/downloads.html")
+        elif "apple" in device:
+            return NetworkDevice("https://support.apple.com/downloads")
         
         if platform.system() == "Windows":
             return NetworkDevice("https://support.microsoft.com/en-us/windows")
         elif platform.system() == "Linux":
             return NetworkDevice("https://kernel.org")
+        elif platform.system() == "Darwin":
+            return NetworkDevice("https://support.apple.com/downloads")
     except:
         pass
     
@@ -593,6 +719,7 @@ def get_mainboard_name():
                         return Mainboard(name)
         elif platform.system() == "Linux":
             try:
+                # Try dmidecode first
                 output = subprocess.check_output(["sudo", "dmidecode", "-t", "baseboard"], 
                                                 stderr=subprocess.DEVNULL).decode()
                 manufacturer = ""
@@ -607,6 +734,7 @@ def get_mainboard_name():
                     return Mainboard(f"{manufacturer} {product}")
             except:
                 try:
+                    # Try sysfs
                     with open('/sys/devices/virtual/dmi/id/board_vendor', 'r') as f:
                         manufacturer = f.read().strip()
                     with open('/sys/devices/virtual/dmi/id/board_name', 'r') as f:
@@ -615,18 +743,44 @@ def get_mainboard_name():
                         return Mainboard(f"{manufacturer} {product}")
                 except:
                     pass
+            
+            # Try to get from /proc/cpuinfo for ARM boards
+            try:
+                with open('/proc/cpuinfo', 'r') as f:
+                    content = f.read()
+                    if 'Raspberry Pi' in content:
+                        return Mainboard("Raspberry Pi Foundation Raspberry Pi")
+                    elif 'Hardware' in content:
+                        for line in content.split('\n'):
+                            if 'Hardware' in line:
+                                hardware = line.split(':')[1].strip()
+                                return Mainboard(hardware)
+            except:
+                pass
         elif platform.system() == "Darwin":
-            output = subprocess.check_output(["system_profiler", "SPHardwareDataType"], 
-                                            stderr=subprocess.DEVNULL).decode()
-            model = ""
-            for line in output.split('\n'):
-                if 'Model Name:' in line:
-                    model = line.split(':')[1].strip()
-                    return Mainboard(f"Apple {model}")
+            # For Apple, return the Mac model
+            try:
+                output = subprocess.check_output(["sysctl", "-n", "hw.model"], 
+                                                stderr=subprocess.DEVNULL).decode().strip()
+                if output:
+                    return Mainboard(f"Apple {output}")
+            except:
+                pass
+            
+            try:
+                output = subprocess.check_output(["system_profiler", "SPHardwareDataType"], 
+                                                stderr=subprocess.DEVNULL).decode()
+                model = ""
+                for line in output.split('\n'):
+                    if 'Model Name:' in line or 'Model Identifier:' in line:
+                        model = line.split(':')[1].strip()
+                        return Mainboard(f"Apple {model}")
+            except:
+                pass
     except:
         pass
     
-    return Mainboard("ASUS ROG STRIX")
+    return Mainboard("Unknown Motherboard")
 
 
 def get_bios_version():
@@ -640,9 +794,6 @@ def get_bios_version():
                     version = bios.SMBIOSBIOSVersion.strip()
                     is_uefi = False
                     try:
-                        import ctypes
-                        kernel32 = ctypes.windll.kernel32
-                        firmware_type = ctypes.c_uint32()
                         if kernel32.GetFirmwareType(ctypes.byref(firmware_type)):
                             if firmware_type.value == 2:
                                 is_uefi = True
@@ -655,6 +806,7 @@ def get_bios_version():
                         return BIOS(f"BIOS {version}")
         elif platform.system() == "Linux":
             try:
+                # Try dmidecode
                 output = subprocess.check_output(["sudo", "dmidecode", "-t", "bios"], 
                                                 stderr=subprocess.DEVNULL).decode()
                 version = ""
@@ -664,15 +816,14 @@ def get_bios_version():
                         break
                 
                 if version:
-                    try:
-                        if os.path.exists('/sys/firmware/efi'):
-                            return BIOS(f"UEFI {version}")
-                        else:
-                            return BIOS(f"BIOS {version}")
-                    except:
-                        return BIOS(version)
+                    # Check if UEFI
+                    if os.path.exists('/sys/firmware/efi'):
+                        return BIOS(f"UEFI {version}")
+                    else:
+                        return BIOS(f"BIOS {version}")
             except:
                 try:
+                    # Try sysfs
                     with open('/sys/devices/virtual/dmi/id/bios_version', 'r') as f:
                         version = f.read().strip()
                     if version:
@@ -682,17 +833,32 @@ def get_bios_version():
                             return BIOS(f"BIOS {version}")
                 except:
                     pass
+                
+                # For ARM devices
+                try:
+                    with open('/proc/device-tree/model', 'r') as f:
+                        model = f.read().strip()
+                        return BIOS(f"Bootloader - {model}")
+                except:
+                    pass
         elif platform.system() == "Darwin":
-            output = subprocess.check_output(["system_profiler", "SPHardwareDataType"], 
-                                            stderr=subprocess.DEVNULL).decode()
-            for line in output.split('\n'):
-                if 'Boot ROM Version:' in line:
-                    version = line.split(':')[1].strip()
-                    return BIOS(f"EFI {version}")
+            try:
+                # macOS uses EFI
+                output = subprocess.check_output(["system_profiler", "SPHardwareDataType"], 
+                                                stderr=subprocess.DEVNULL).decode()
+                for line in output.split('\n'):
+                    if 'Boot ROM Version:' in line:
+                        version = line.split(':')[1].strip()
+                        return BIOS(f"EFI {version}")
+                    elif 'SMC Version:' in line:
+                        version = line.split(':')[1].strip()
+                        return BIOS(f"SMC {version}")
+            except:
+                pass
     except:
         pass
     
-    return BIOS("UEFI 2.7")
+    return BIOS("Unknown Firmware")
 
 
 def get_os_name():
@@ -706,19 +872,42 @@ def get_os_name():
                 return OS(os_info.Caption.strip())
         elif system == "Linux":
             try:
+                # Try distro module first
                 import distro
                 name = distro.name(pretty=True)
                 if name:
                     return OS(name)
             except:
                 pass
+            
+            # Fallback to /etc/os-release
+            if os.path.exists('/etc/os-release'):
+                with open('/etc/os-release', 'r') as f:
+                    content = f.read()
+                    name_match = re.search(r'PRETTY_NAME="([^"]+)"', content)
+                    if name_match:
+                        return OS(name_match.group(1))
+                    
+                    name_match = re.search(r'NAME="([^"]+)"', content)
+                    version_match = re.search(r'VERSION="([^"]+)"', content)
+                    if name_match and version_match:
+                        return OS(f"{name_match.group(1)} {version_match.group(1)}")
+            
+            # Check for specific distributions
+            if os.path.exists('/etc/redhat-release'):
+                with open('/etc/redhat-release', 'r') as f:
+                    return OS(f.read().strip())
+            elif os.path.exists('/etc/debian_version'):
+                with open('/etc/debian_version', 'r') as f:
+                    debian_version = f.read().strip()
+                    return OS(f"Debian {debian_version}")
         elif system == "Darwin":
             try:
-                output = subprocess.check_output(["sw_vers", "-productName"], 
-                                                stderr=subprocess.DEVNULL).decode().strip()
-                version_output = subprocess.check_output(["sw_vers", "-productVersion"], 
-                                                        stderr=subprocess.DEVNULL).decode().strip()
-                return OS(f"{output} {version_output}")
+                product_name = subprocess.check_output(["sw_vers", "-productName"], 
+                                                      stderr=subprocess.DEVNULL).decode().strip()
+                product_version = subprocess.check_output(["sw_vers", "-productVersion"], 
+                                                         stderr=subprocess.DEVNULL).decode().strip()
+                return OS(f"{product_name} {product_version}")
             except:
                 pass
     except:
@@ -740,7 +929,9 @@ def get_os_release():
         elif platform.system() == "Linux":
             try:
                 import distro
-                return OS(distro.version(pretty=True))
+                version = distro.version(pretty=True)
+                if version:
+                    return OS(version)
             except:
                 if os.path.exists('/etc/os-release'):
                     with open('/etc/os-release', 'r') as f:
@@ -748,6 +939,18 @@ def get_os_release():
                             if 'VERSION_ID=' in line:
                                 version = line.split('=')[1].strip().strip('"')
                                 return OS(version)
+            
+            # Kernel version as fallback
+            return OS(platform.release())
+        elif platform.system() == "Darwin":
+            try:
+                product_version = subprocess.check_output(["sw_vers", "-productVersion"], 
+                                                         stderr=subprocess.DEVNULL).decode().strip()
+                build_version = subprocess.check_output(["sw_vers", "-buildVersion"], 
+                                                       stderr=subprocess.DEVNULL).decode().strip()
+                return OS(f"{product_version} ({build_version})")
+            except:
+                pass
     except:
         pass
     
@@ -771,14 +974,36 @@ def get_os_version():
                                                 stderr=subprocess.DEVNULL).decode()
                 description = ""
                 release = ""
+                codename = ""
                 for line in output.split('\n'):
                     if 'Description:' in line:
                         description = line.split(':')[1].strip()
                     elif 'Release:' in line:
                         release = line.split(':')[1].strip()
+                    elif 'Codename:' in line:
+                        codename = line.split(':')[1].strip()
                 
                 if description and release:
-                    return OS(f"{description} ({release})")
+                    if codename:
+                        return OS(f"{description} ({release} - {codename})")
+                    else:
+                        return OS(f"{description} ({release})")
+            except:
+                pass
+            
+            # Try uname
+            kernel_version = platform.release()
+            return OS(f"Linux Kernel {kernel_version}")
+        elif platform.system() == "Darwin":
+            try:
+                product_name = subprocess.check_output(["sw_vers", "-productName"], 
+                                                      stderr=subprocess.DEVNULL).decode().strip()
+                product_version = subprocess.check_output(["sw_vers", "-productVersion"], 
+                                                         stderr=subprocess.DEVNULL).decode().strip()
+                build_version = subprocess.check_output(["sw_vers", "-buildVersion"], 
+                                                       stderr=subprocess.DEVNULL).decode().strip()
+                kernel_version = platform.release()
+                return OS(f"{product_name} {product_version} (Build {build_version}, Kernel {kernel_version})")
             except:
                 pass
     except:
@@ -810,14 +1035,24 @@ def get_os_url():
                     return OS("https://www.debian.org/distrib/")
                 elif distro_id == "fedora":
                     return OS("https://getfedora.org/")
-                elif distro_id == "centos":
-                    return OS("https://www.centos.org/download/")
+                elif distro_id == "centos" or distro_id == "rocky":
+                    return OS("https://www.rockylinux.org/download/")
                 elif distro_id == "arch":
                     return OS("https://archlinux.org/download/")
+                elif distro_id == "raspbian":
+                    return OS("https://www.raspberrypi.com/software/")
+                elif distro_id == "alpine":
+                    return OS("https://alpinelinux.org/downloads/")
                 else:
                     return OS("https://kernel.org/")
             except:
-                return OS("https://kernel.org/")
+                # Check for specific files
+                if os.path.exists("/etc/redhat-release"):
+                    return OS("https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux")
+                elif os.path.exists("/etc/debian_version"):
+                    return OS("https://www.debian.org/distrib/")
+                else:
+                    return OS("https://kernel.org/")
         elif system == "Darwin":
             return OS("https://support.apple.com/downloads/macos")
         else:
